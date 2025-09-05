@@ -38,6 +38,12 @@ If you use this work in an academic context, please cite the following publicati
   doi={10.1109/IROS58592.2024.10802359}}
 ```
 
+> [!IMPORTANT]  
+> **More Advanced Controller is Also Open Source!**  
+> Check **[Nullspace MPC Repository](https://github.com/MizuhoAOKI/nullspace_mpc)**  
+> Compared to MPPI, it achieves **faster navigation** while ensuring **higher safety**,  
+> at the cost of **increased computational demand**.
+
 ## Setup
 
 ### [Option 1] Docker environment
