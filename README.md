@@ -27,7 +27,7 @@
 ## Citation
 If you use this work in an academic context, please cite the following publication:
 ```bibtex
-@inproceedings{mizuho2024iros
+@inproceedings{mizuho2024iros,
   author={Aoki, Mizuho and Honda, Kohei and Okuda, Hiroyuki and Suzuki, Tatsuya},
   booktitle={2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 
   title={Switching Sampling Space of Model Predictive Path-Integral Controller to Balance Efficiency and Safety in 4WIDS Vehicle Navigation}, 
