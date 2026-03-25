@@ -1,0 +1,17 @@
+# Costmap global parameters adapted for Saturn Lite hexapod
+
+obstacle_range: 5.0
+raytrace_range: 10.0
+footprint_padding: 0.02
+
+robot_radius: 0.45
+inflation_radius: 0.50
+
+observation_sources: laser_scan_sensor
+laser_scan_sensor:
+  sensor_frame: laser_link
+  data_type: LaserScan
+  topic: /laser_link/scan
+  marking: true
+  clearing: true
+  observation_persistence: 0.0

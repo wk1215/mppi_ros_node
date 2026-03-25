@@ -1,0 +1,88 @@
+# =============================================================
+# Saturn Lite Hexapod - Gazebo ros_control Joint Controllers
+# =============================================================
+# All 18 revolute joints use PositionJointInterface
+# Namespace: /saturn
+
+# Joint State Controller (publishes /saturn/joint_states)
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 50  # Hz
+
+# ==================== Front-Left (FL) Leg ====================
+fl_hip_controller:
+  type: position_controllers/JointPositionController
+  joint: fl_hip_joint
+
+fl_thigh_controller:
+  type: position_controllers/JointPositionController
+  joint: fl_thigh_joint
+
+fl_shank_controller:
+  type: position_controllers/JointPositionController
+  joint: fl_shank_joint
+
+# ==================== Front-Right (FR) Leg ====================
+fr_hip_controller:
+  type: position_controllers/JointPositionController
+  joint: fr_hip_joint
+
+fr_thigh_controller:
+  type: position_controllers/JointPositionController
+  joint: fr_thigh_joint
+
+fr_shank_controller:
+  type: position_controllers/JointPositionController
+  joint: fr_shank_joint
+
+# ==================== Mid-Left (ML) Leg ====================
+ml_hip_controller:
+  type: position_controllers/JointPositionController
+  joint: ml_hip_joint
+
+ml_thigh_controller:
+  type: position_controllers/JointPositionController
+  joint: ml_thigh_joint
+
+ml_shank_controller:
+  type: position_controllers/JointPositionController
+  joint: ml_shank_joint
+
+# ==================== Mid-Right (MR) Leg ====================
+mr_hip_controller:
+  type: position_controllers/JointPositionController
+  joint: mr_hip_joint
+
+mr_thigh_controller:
+  type: position_controllers/JointPositionController
+  joint: mr_thigh_joint
+
+mr_shank_controller:
+  type: position_controllers/JointPositionController
+  joint: mr_shank_joint
+
+# ==================== Rear-Left (RL) Leg ====================
+rl_hip_controller:
+  type: position_controllers/JointPositionController
+  joint: rl_hip_joint
+
+rl_thigh_controller:
+  type: position_controllers/JointPositionController
+  joint: rl_thigh_joint
+
+rl_shank_controller:
+  type: position_controllers/JointPositionController
+  joint: rl_shank_joint
+
+# ==================== Rear-Right (RR) Leg ====================
+rr_hip_controller:
+  type: position_controllers/JointPositionController
+  joint: rr_hip_joint
+
+rr_thigh_controller:
+  type: position_controllers/JointPositionController
+  joint: rr_thigh_joint
+
+rr_shank_controller:
+  type: position_controllers/JointPositionController
+  joint: rr_shank_joint

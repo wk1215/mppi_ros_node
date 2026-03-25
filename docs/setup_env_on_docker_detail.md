@@ -3,7 +3,6 @@
 ## Prerequisites
 - any os that supports docker (following settings was tested on ubuntu 20.04)
 - [docker](https://docs.docker.com/engine/install/ubuntu/)
-- [rocker](https://github.com/osrf/rocker)
 
 ## First time setup
 1. clone the project repository.
@@ -15,39 +14,33 @@
    make sure to connect to the internet because dependent packages will be downloaded.
     ```
     cd <path to your workspace>/mppi_swerve_drive_ros
-    docker build -t noetic_image -f docker/Dockerfile . --no-cache
+    docker compose build
     ```
-1. check if the docker image is successfully built.  
-    you should see `noetic_image` in the list.
-    ```
-    $ docker images
-    REPOSITORY     TAG       IMAGE ID       CREATED        SIZE
-    noetic_image   latest    da8d5c24afd6   11 hours ago   3.52GB
-    ```
-1. run the docker container and get into the bash inside.   
-   rocker enables you to use GUI applications (ex. rviz, gazebo) and usb devices (ex. joypad) on the docker container.
+1. start the docker container.
     ```
     cd <path to your workspace>/mppi_swerve_drive_ros
-    rocker --x11 --user --network host --privileged --nocleanup --volume .:/home/$USER/mppi_swerve_drive_ros --name noetic_container noetic_image:latest
+    docker compose up -d
     ```
-    - shortcut of the command above:
-        ```
-        cd <path to your workspace>/mppi_swerve_drive_ros
-        make drock
-        ```
+1. get into the bash inside the running container.
+    ```
+    cd <path to your workspace>/mppi_swerve_drive_ros
+    docker compose exec noetic bash
+    ```
 1. [inside the docker container] clean the cache.
     ```
     cd ~/mppi_swerve_drive_ros
-    make clean
+    rm -rf build devel logs .catkin_tools
     ```
 1. [inside the docker container] build the project.
     ```
     cd ~/mppi_swerve_drive_ros
-    make build
+    source /opt/ros/noetic/setup.bash
+    catkin build --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-O2"
+    source devel/setup.bash
     ```
 
 ## [After the first time setup] Use the running container
-1. the command `rocker --x11 ...` above started a docker container named `noetic_container`.  
+1. the command `docker compose up -d` above started a docker container named `noetic_container`.  
     check if noetic_container is running.   
    if it is running currently, you should see `noetic_container` in the list.  
    "STATUS" saying "Up" means the container is running now.
@@ -58,13 +51,8 @@
     ```
 1. get into the bash inside the running container.
     ```
-    docker exec -it noetic_container /bin/bash
+    docker compose exec noetic bash
     ```
-    - shortcut of the command above:
-        ```
-        cd <path to your workspace>/mppi_swerve_drive_ros
-        make dexec
-        ```
 1. [inside the docker container] exit the container.
     this command just exits from the bash inside the container and returns to the host terminal, but the container itself remains running.
     ```
@@ -75,21 +63,21 @@
 ## Other commands
 -  stop the container.
     ```
-    docker stop noetic_container
+    docker compose stop
     ```
 -  restart the container.
     ```
-    docker start noetic_container
+    docker compose start
     ```
-    use this command when you run `docker exec ...` but the output saids `<the target container> is not running`.
+    use this command when you run `docker compose exec ...` but the output says the container is not running.
 -  clean up.
     1. remove the container.
         ```
-        docker rm noetic_container
+        docker compose down
         ```
-    1. remove the image.
+    1. remove the image too.
         ```
-        docker rmi noetic_image:latest
+        docker compose down --rmi local
         ```
 
 

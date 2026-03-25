@@ -1,0 +1,25 @@
+# =============================================================
+# Hexapod Velocity Driver - Tripod Gait Parameters
+# =============================================================
+
+# Control loop rate
+control_rate: 50.0          # Hz
+
+# Gait parameters
+gait_frequency: 2.0         # Hz - base tripod gait cycle frequency
+stride_length: 0.25         # rad - thigh joint swing amplitude
+lift_height: 0.25           # rad - shank joint lift during swing
+lateral_gain: 0.15          # rad per (m/s) - hip swing for lateral motion
+turn_gain: 0.12             # rad per (rad/s) - differential stride for turning
+
+# Velocity limits (matching MPPI hexapod config)
+max_vx: 0.5                 # m/s - max forward/backward speed
+max_vy: 0.3                 # m/s - max lateral speed
+max_omega: 1.0              # rad/s - max yaw rate
+
+# Safety
+velocity_deadzone: 0.02     # m/s - below this speed, stand still
+cmd_timeout: 0.5            # seconds - zero velocity after timeout
+
+# Smoothing
+smoothing_factor: 0.8       # exponential smoothing [0=no smooth, 1=max smooth]

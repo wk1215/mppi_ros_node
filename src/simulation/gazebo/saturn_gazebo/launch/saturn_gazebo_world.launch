@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- =============================================================
+     Saturn Lite Hexapod - Gazebo World Launch
+     
+     Loads Gazebo + hexapod model + joint controllers + odometry.
+     Mirrors the structure of gazebo_world.launch for the wheeled robot.
+     ============================================================= -->
+<launch>
+
+  <!-- ===== Arguments ===== -->
+  <arg name="gazebo_world_name" default="maze"/>
+  <arg name="open_rviz" default="false"/>
+  <arg name="use_vel_driver" default="true"/>
+  <arg name="paused" default="false"/>
+
+  <!-- Paths -->
+  <arg name="workspace" default="$(env HOME)/mppi_swerve_drive_ros"/>
+  <arg name="urdf_source" default="$(arg workspace)/saturn_lab4.5/saturn_lab/saturn/resources/saturn_lite/urdf/urdf/saturn_lite_new_urdf.urdf"/>
+  <arg name="rvizconfig" default="$(find world_handler)/rviz/fwids_vehicle.rviz"/>
+
+  <!-- ===== Generate Gazebo-ready URDF ===== -->
+  <!-- Process original URDF: fix mesh paths + add transmissions + add Gazebo plugins -->
+  <param name="robot_description"
+         command="python3 $(find saturn_gazebo)/scripts/process_urdf.py $(arg urdf_source) package://saturn_gazebo"/>
+
+  <!-- ===== Launch Gazebo World ===== -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find world_handler)/world/$(arg gazebo_world_name).world"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="true"/>
+    <arg name="gui" value="true"/>
+    <arg name="headless" value="false"/>
+    <arg name="debug" value="false"/>
+  </include>
+
+  <!-- ===== Spawn Hexapod Model ===== -->
+  <!-- Spawn at height 0.42m (default standing height) -->
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model"
+        args="-param robot_description -x 0.0 -y 0.0 -z 0.42 -R 0 -P 0 -Y 0 -urdf -model saturn_lite"
+        output="screen"/>
+
+  <!-- ===== Load and Start Joint Controllers ===== -->
+  <rosparam command="load" file="$(find saturn_gazebo)/config/saturn_controller.yaml" ns="saturn"/>
+
+  <node name="controller_spawner" pkg="controller_manager"
+        type="spawner" respawn="false" output="screen" ns="/saturn"
+        args="joint_state_controller
+              fl_hip_controller fl_thigh_controller fl_shank_controller
+              fr_hip_controller fr_thigh_controller fr_shank_controller
+              ml_hip_controller ml_thigh_controller ml_shank_controller
+              mr_hip_controller mr_thigh_controller mr_shank_controller
+              rl_hip_controller rl_thigh_controller rl_shank_controller
+              rr_hip_controller rr_thigh_controller rr_shank_controller"/>
+
+  <!-- ===== Robot State Publisher (TF) ===== -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher">
+    <remap from="/joint_states" to="/saturn/joint_states"/>
+  </node>
+
+  <!-- ===== Ground Truth Odometry Publisher ===== -->
+  <include file="$(find groundtruth_odom_publisher)/launch/groundtruth_odom_publisher.launch"/>
+
+  <!-- ===== Hexapod Velocity Driver (Tripod Gait) ===== -->
+  <group if="$(arg use_vel_driver)">
+    <node pkg="saturn_gazebo" type="hexapod_vel_driver.py" name="hexapod_vel_driver" output="screen">
+      <rosparam command="load" file="$(find saturn_gazebo)/config/hexapod_vel_driver.yaml"/>
+    </node>
+  </group>
+
+  <!-- ===== World Handler (for clean shutdown) ===== -->
+  <node pkg="world_handler" type="world_handler_node" name="world_handler" output="screen"/>
+
+  <!-- ===== RViz (optional) ===== -->
+  <group if="$(arg open_rviz)">
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true"/>
+  </group>
+
+</launch>
