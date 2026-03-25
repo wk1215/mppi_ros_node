@@ -67,8 +67,8 @@ class MPPICore
         ControlSeqSamples generateNoiseMatrix(ControlSeq& sigma);
 
         // for random number generation
-        const int random_seed_ = 623;
-        std::mt19937 psedo_random_engine_;
+        const unsigned int random_seed_ = 623;
+        unsigned int noise_generation_count_ = 0;
 
         // for savisky-golay filter
         int SG_FILTER_WINDOW_SIZE_, SG_FILTER_HALF_WINDOW_SIZE_, SG_FILTER_POLY_ORDER_;
@@ -86,5 +86,6 @@ class MPPICore
             const double delta
         );
         Control applySaviskyGolayFilter(ControlSeq& u_seq);
+        ControlSeq shiftControlSequence(const ControlSeq& u_seq) const;
 };
 } // namespace controller

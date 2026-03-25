@@ -12,6 +12,11 @@ MPPICore::MPPICore(param::Param& param)
     T = param.controller.prediction_horizon;
     XDIM = target_system::DIM_STATE_SPACE;
     UDIM = target_system::DIM_CONTROL_SPACE;
+    calc_time_ = 0.0f;
+    state_cost_ = 0.0;
+    is_goal_reached_ = false;
+    Control zero_control;
+    zero_control.setZero();
 
     // initialize variables for mppi calculation
     costs_ = Samples(K, 0.0); // size is (K)
@@ -19,11 +24,11 @@ MPPICore::MPPICore(param::Param& param)
     weights_ = Samples(K, 0.0); // size is (K)
     x_opt_seq_ = StateSeq(T, State()); // size is (T, XDIM)
     x_samples_ = StateSeqSamples(K, StateSeq(T, State())); // size is (K, T, XDIM)
-    u_opt_latest_ = Control(); // size is (UDIM)
-    u_opt_seq_latest_ = ControlSeq(T, Control()); // size is (T, UDIM)
-    u_samples_ = ControlSeqSamples(K, ControlSeq(T, Control())); // size is (K, T, UDIM)
-    noises_ = ControlSeqSamples(K, ControlSeq(T, Control())); // size is (K, T, UDIM)
-    sigma_ = ControlSeq(T, Control()); // size is (T, UDIM)
+    u_opt_latest_ = zero_control; // size is (UDIM)
+    u_opt_seq_latest_ = ControlSeq(T, zero_control); // size is (T, UDIM)
+    u_samples_ = ControlSeqSamples(K, ControlSeq(T, zero_control)); // size is (K, T, UDIM)
+    noises_ = ControlSeqSamples(K, ControlSeq(T, zero_control)); // size is (K, T, UDIM)
+    sigma_ = ControlSeq(T, zero_control); // size is (T, UDIM)
 
     // initialize sigma_
     for (int t = 0; t < T; t++)
@@ -33,9 +38,6 @@ MPPICore::MPPICore(param::Param& param)
             sigma_[t][u] = param.controller.sigma[u];
         }
     }
-
-    // initialize pseudo random engine
-    psedo_random_engine_.seed(random_seed_);
 
     // generate noise matrix
     noises_ = generateNoiseMatrix(sigma_);
@@ -117,7 +119,7 @@ common_type::VxVyOmega MPPICore::solveMPPI(
 
             // update state
             x = target_system::calcNextState(
-                x, u_samples_[k][t-1], param_.controller.step_len_sec
+                x, u_samples_[k][t-1], param_.controller.step_len_sec, param_
             );
             x_samples_[k][t-1] = x; // save x_samples
 
@@ -142,14 +144,25 @@ common_type::VxVyOmega MPPICore::solveMPPI(
 
     // calculate weight for each sample
     weights_ = calcWeightsOfSamples(costs_);
+    const int best_sample_idx = costs_rank_[0];
 
     // calculate optimal control command
-    ControlSeq u_opt_seq = u_opt_seq_latest_;
-    for (int k = 0; k < K; k++)
+    ControlSeq u_opt_seq = ControlSeq(T, u_opt_latest_);
+    for (int t = 0; t < T; t++)
     {
-        for (int t = 0; t < T; t++)
+        Eigen::Matrix<double, 3, 1> weighted_control = Eigen::Matrix<double, 3, 1>::Zero();
+        for (int k = 0; k < K; k++)
         {
-            u_opt_seq[t].update(u_opt_seq[t].eigen() + weights_[k] * noises_[k][t].eigen());
+            weighted_control += weights_[k] * u_samples_[k][t].eigen();
+        }
+        u_opt_seq[t].update(weighted_control);
+        if (param_.controller.best_sample_blend > 0.0)
+        {
+            const double best_sample_blend = std::max(0.0, std::min(1.0, param_.controller.best_sample_blend));
+            u_opt_seq[t].update(
+                (1.0 - best_sample_blend) * u_opt_seq[t].eigen()
+                + best_sample_blend * u_samples_[best_sample_idx][t].eigen()
+            );
         }
     }
 
@@ -162,7 +175,7 @@ common_type::VxVyOmega MPPICore::solveMPPI(
     // clip control input between umin and umax
     for (int t = 0; t < T; t++)
     {
-        u_opt_seq[t].clamp();
+        target_system::clampControlInput(u_opt_seq[t], param_);
     }
 
     // get mppi calculation time [ms]
@@ -175,7 +188,7 @@ common_type::VxVyOmega MPPICore::solveMPPI(
     for (int t = 1; t < T; t++)
     {
         x_opt_seq_[t] = target_system::calcNextState(
-            x_opt_seq_[t-1], u_opt_seq[t-1], param_.controller.step_len_sec
+            x_opt_seq_[t-1], u_opt_seq[t-1], param_.controller.step_len_sec, param_
         );
 
         // add stage cost
@@ -199,7 +212,7 @@ common_type::VxVyOmega MPPICore::solveMPPI(
     // convert optimal control command to VxVyOmega
     common_type::VxVyOmega optimal_vxvyw_cmd = target_system::convertControlSpace3DToVxVyOmega(u_opt_seq[0]);
     u_opt_latest_ = u_opt_seq[0]; // update u_opt_latest_
-    u_opt_seq_latest_ = u_opt_seq; // update u_opt_seq_latest_
+    u_opt_seq_latest_ = shiftControlSequence(u_opt_seq); // use receding-horizon warm start
     return optimal_vxvyw_cmd;
 }
 
@@ -212,18 +225,21 @@ ControlSeqSamples MPPICore::generateNoiseMatrix(ControlSeq& sigma)
 {
     // declare noise matrix
     ControlSeqSamples noises = ControlSeqSamples(K, ControlSeq(T, Control()));
+    const unsigned int base_seed = random_seed_ + 104729 * noise_generation_count_;
+    noise_generation_count_++;
 
     // set random value to noises, which is normal distribution with mean 0.0 and variance sigma[t][u]
     // [CPU Acceleration with OpenMP]
-    #pragma omp parallel for num_threads(omp_get_max_threads()) collapse(3)
+    #pragma omp parallel for num_threads(omp_get_max_threads())
     for (int k = 0; k < K; k++)
     {
+        std::mt19937 local_random_engine(base_seed + 1619 * static_cast<unsigned int>(k + 1));
         for (int t = 0; t < T; t++)
         {
             for (int u = 0; u < UDIM; u++)
             {
                 std::normal_distribution<double> normal_dist(0.0, sigma[t][u]);
-                noises[k][t][u] = normal_dist(psedo_random_engine_);
+                noises[k][t][u] = normal_dist(local_random_engine);
             }
         }
     }
@@ -281,7 +297,9 @@ void MPPICore::initSaviskyGolayFilter(
     SG_FILTER_WINDOW_SIZE_ = 2 * SG_FILTER_HALF_WINDOW_SIZE_ + 1; // HALF_WINDOW(past u log) | u_opt_seq[0] | HALF_WINDOW(u prediction)
     SG_FILTER_POLY_ORDER_ = poly_order;
     SG_FILTER_DELTA_ = delta;
-    u_log_seq_for_filter_ = ControlSeq(SG_FILTER_HALF_WINDOW_SIZE_, Control()); // size is (SG_FILTER_HALF_WINDOW_SIZE_, UDIM)
+    Control zero_control;
+    zero_control.setZero();
+    u_log_seq_for_filter_ = ControlSeq(SG_FILTER_HALF_WINDOW_SIZE_, zero_control); // size is (SG_FILTER_HALF_WINDOW_SIZE_, UDIM)
 
     // calculate and save savisky-golay filter coefficients (you need to call this function only once)
     savisky_golay_coeffs_ = calcSaviskyGolayCoeffs(
@@ -346,6 +364,22 @@ Control MPPICore::applySaviskyGolayFilter(ControlSeq& u_opt_seq)
 
     // return smoothed control input
     return u_opt_filtered;
+}
+
+ControlSeq MPPICore::shiftControlSequence(const ControlSeq& u_seq) const
+{
+    if (u_seq.empty())
+    {
+        return u_seq;
+    }
+
+    ControlSeq shifted_seq = u_seq;
+    for (int t = 0; t < T - 1; t++)
+    {
+        shifted_seq[t] = u_seq[t + 1];
+    }
+    shifted_seq[T - 1] = u_seq[T - 1];
+    return shifted_seq;
 }
 
 // get calc time [ms]

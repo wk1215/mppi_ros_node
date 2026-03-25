@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <algorithm>
 #include <cmath>
 #include <Eigen/Dense>
 #include <Eigen/Core>
@@ -34,6 +35,13 @@ inline common_type::VxVyOmega convertControlSpace3DToVxVyOmega(const ControlSpac
     return cmd; // in mppi_3d, ControlSpace3D is equal to VxVyOmega
 }
 
+inline void clampControlInput(ControlSpace3D& cmd, const param::Param& param)
+{
+    cmd.vx = std::max(param.controller.vx_min, std::min(param.controller.vx_max, cmd.vx));
+    cmd.vy = std::max(param.controller.vy_min, std::min(param.controller.vy_max, cmd.vy));
+    cmd.omega = std::max(param.controller.omega_min, std::min(param.controller.omega_max, cmd.omega));
+}
+
 // 8DoF vehicle command space
 using ControlSpace8D = common_type::VehicleCommand8D; // check definition of VehicleCommand8D in common_type.hpp
 static constexpr int DIM_VEHICLE_COMMAND_SPACE = 8;
@@ -53,11 +61,16 @@ inline ControlSpace8D convertControlSpace3DToControlSpace8D(const ControlSpace3D
 }
 
 // define state updating rule
-inline StateSpace3D calcNextState(const StateSpace3D& current_state, const ControlSpace3D& cmd, const double dt)
+inline StateSpace3D calcNextState(
+    const StateSpace3D& current_state,
+    const ControlSpace3D& cmd,
+    const double dt,
+    const param::Param& param
+)
 {
     // clamp control input
     ControlSpace3D clamped_cmd = cmd;
-    clamped_cmd.clamp();
+    clampControlInput(clamped_cmd, param);
 
     // calculate next state
     StateSpace3D next_state;
@@ -88,14 +101,15 @@ namespace controller
     )
     {
         // clamp control input
-        control_input.clamp();
-        prev_control_input.clamp();
+        target_system::clampControlInput(control_input, param);
+        target_system::clampControlInput(prev_control_input, param);
 
         // initialize stage cost
         double cost = 0.0;
+        const double goal_distance = std::sqrt(std::pow(goal_state.x - state.x, 2) + std::pow(goal_state.y - state.y, 2));
 
         // only when the vehicle is not close to the goal
-        if( std::sqrt( pow(goal_state.x - state.x, 2) + pow(goal_state.y - state.y, 2) ) > param.navigation.xy_goal_tolerance )
+        if (goal_distance > param.navigation.xy_goal_tolerance)
         {
             // track target velocity (considering only aligned component to the reference path)
             if (ref_yaw_map.isInside(grid_map::Position(state.x, state.y)))
@@ -107,7 +121,7 @@ namespace controller
                 Eigen::Matrix<double, 2, 1> current_vel;
                 current_vel << control_input.vx, control_input.vy;
                 double ref_aligned_vel = ref_vel_direction.dot(current_vel);
-                cost += param.controller.weight_velocity_error * pow(ref_aligned_vel - param.controller.ref_velocity, 2);
+                cost += param.controller.weight_velocity_error * std::pow(ref_aligned_vel - param.controller.ref_velocity, 2);
             }
 
             // try to align with the reference path
@@ -136,6 +150,7 @@ namespace controller
         // penalize large control input change (vx, vy, omega)
         Eigen::Matrix<double, 1, target_system::DIM_CONTROL_SPACE> weight_command_change(param.controller.weight_cmd_change.data());
         cost += weight_command_change * (control_input.eigen() - prev_control_input.eigen()).cwiseAbs2();
+        cost += param.controller.weight_lateral_velocity_penalty * control_input.vy * control_input.vy;
 
         // penalize large vehicle command change (steer_fl, steer_fr, steer_rl, steer_rr, rotor_fl, rotor_fr, rotor_rl, rotor_rr)
         target_system::ControlSpace8D vehicle_command = target_system::convertControlSpace3DToControlSpace8D(control_input, param);
@@ -168,4 +183,3 @@ namespace controller
     }
 
 } // namespace controller
-

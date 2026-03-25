@@ -30,15 +30,24 @@ MPPI::MPPI()
     private_nh_.param<double>("controller/param_lambda", param.controller.param_lambda, 0.1);
     private_nh_.param<double>("controller/param_alpha", param.controller.param_alpha, 0.1);
     private_nh_.param<std::vector<double>>("controller/sigma", param.controller.sigma, {1.0, 1.0, 0.78}); // for {vx, vy, yawrate} in this order
-    private_nh_.param<bool>("controller/reduce_computation", param.controller.reduce_computation, false);  
+    private_nh_.param<bool>("controller/reduce_computation", param.controller.reduce_computation, false);
+    private_nh_.param<double>("controller/vx_min", param.controller.vx_min, -2.0);
+    private_nh_.param<double>("controller/vx_max", param.controller.vx_max, 2.0);
+    private_nh_.param<double>("controller/vy_min", param.controller.vy_min, -2.0);
+    private_nh_.param<double>("controller/vy_max", param.controller.vy_max, 2.0);
+    private_nh_.param<double>("controller/omega_min", param.controller.omega_min, -1.57);
+    private_nh_.param<double>("controller/omega_max", param.controller.omega_max, 1.57);
     private_nh_.param<std::vector<double>>("controller/weight_cmd_change", param.controller.weight_cmd_change, {0.0, 0.0, 0.0}); // for {vx, vy, yawrate} in this order
     private_nh_.param<std::vector<double>>("controller/weight_vehicle_cmd_change", param.controller.weight_vehicle_cmd_change, {1.4, 1.4, 1.4, 1.4, 0.1, 0.1, 0.1, 0.1}); // mid
-    private_nh_.param<double>("controller/ref_velocity", param.controller.ref_velocity, 2.0); // [m/s]
+    private_nh_.param<double>("controller/reference_velocity", param.controller.ref_velocity, 2.0); // [m/s]
+    private_nh_.param<double>("controller/ref_velocity", param.controller.ref_velocity, param.controller.ref_velocity); // backward compatibility
     private_nh_.param<double>("controller/weight_velocity_error", param.controller.weight_velocity_error, 10.0);
     private_nh_.param<double>("controller/weight_angular_error", param.controller.weight_angular_error, 30.0);
     private_nh_.param<double>("controller/weight_collision_penalty", param.controller.weight_collision_penalty, 50.0);
     private_nh_.param<double>("controller/weight_distance_error_penalty", param.controller.weight_distance_error_penalty, 40.0);
     private_nh_.param<double>("controller/weight_terminal_state_penalty", param.controller.weight_terminal_state_penalty, 50.0);
+    private_nh_.param<double>("controller/weight_lateral_velocity_penalty", param.controller.weight_lateral_velocity_penalty, 0.0);
+    private_nh_.param<double>("controller/best_sample_blend", param.controller.best_sample_blend, 0.0);
     private_nh_.param<bool>("controller/use_sg_filter", param.controller.use_sg_filter, true);
     private_nh_.param<int>("controller/sg_filter_half_window_size", param.controller.sg_filter_half_window_size, 10);
     private_nh_.param<int>("controller/sg_filter_poly_order", param.controller.sg_filter_poly_order, 3);
@@ -174,7 +183,7 @@ void MPPI::calcControlCommand(const ros::TimerEvent& event)
     // check if all necessary data are received, and return if not.
     if (!odom_received_ || !ref_path_received_ || !collision_costmap_received_ || !distance_error_map_received_ || !ref_yaw_map_received_)
     {
-        ROS_WARN("[MPPI] not all necessary data are received, odom: %d, ref_path: %d, collision_costmap: %d, distance_error_map: %d, ref_yaw_map: %d", \
+        ROS_WARN_THROTTLE(2.0, "[MPPI] not all necessary data are received, odom: %d, ref_path: %d, collision_costmap: %d, distance_error_map: %d, ref_yaw_map: %d", \
         odom_received_, ref_path_received_, collision_costmap_received_, distance_error_map_received_, ref_yaw_map_received_);
         return;
     }

@@ -36,23 +36,31 @@ controller:
   control_interval: 0.05 # [s]
   num_samples: 3000 # number of samples
   prediction_horizon: 30 # [steps]
-  step_len_sec: 0.033 # [s]
-  param_exploration: 0.1
-  param_lambda: 200.0
+  step_len_sec: 0.05 # [s]
+  param_exploration: 0.12
+  param_lambda: 140.0
   param_alpha: 0.975
-  sigma: [1.00, 1.00, 0.78] # noise for [vx, vy, omega]
+  sigma: [0.5, 0.15, 0.5] # noise for [vx, vy, omega]
   reduce_computation: false # if true, noise sampling is done only once and the same noise is used for all processes.
-  weight_cmd_change: [0.0, 0.0, 0.0] # penalty weight for variation of [vx, vy, omega]
-  weight_vehicle_cmd_change: [1.4, 1.4, 1.4, 1.4, 0.1, 0.1, 0.1, 0.1] # penalty weight for variation of [fl_steer, fr_steer, rl_steer, rr_steer, fl_vel, fr_vel, rl_vel, rr_vel]
-  reference_velocity: 2.0 # [m/s]
-  weight_velocity_error: 10.0
-  weight_angular_error: 30.0
-  weight_collision_penalty: 50.0
-  weight_distance_error_penalty: 40.0
-  weight_terminal_state_penalty: 10.0
+  vx_min: -0.8
+  vx_max: 1.0
+  vy_min: -0.2
+  vy_max: 0.2
+  omega_min: -0.65
+  omega_max: 0.65
+  weight_cmd_change: [2.4, 4.0, 2.2] # penalty weight for variation of [vx, vy, omega]
+  weight_vehicle_cmd_change: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] # upper-layer control does not need swerve-specific penalties
+  reference_velocity: 1.0 # [m/s]
+  weight_velocity_error: 6.0
+  weight_angular_error: 42.0
+  weight_collision_penalty: 90.0
+  weight_distance_error_penalty: 36.0
+  weight_terminal_state_penalty: 55.0
+  weight_lateral_velocity_penalty: 24.0
+  best_sample_blend: 0.25
   use_sg_filter: true # set true to use Savitzky-Golay filter for smoothing the control input
-  sg_filter_half_window_size: 4 # value in the range of 1 ~ (prediction_horizon - 1) is allowed.
-  sg_filter_poly_order: 6
+  sg_filter_half_window_size: 3 # value in the range of 1 ~ (prediction_horizon - 1) is allowed.
+  sg_filter_poly_order: 3
 # Note: 
-## - to change the velocity limit of the controller, check ../include/mppi_3d/common_type.hpp
+## - velocity limits can now be tuned directly with controller/vx_*, vy_*, omega_*
 ## - to edit the prediction model or the cost function, check ../include/mppi_3d/mppi_3d_setting.hpp
