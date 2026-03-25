@@ -1,15 +1,12 @@
 <launch>
-    <!-- arguments -->
+    <!-- Backward-compatible wrapper. Prefer roslaunch mppi_bringup rosbag_play.launch -->
     <arg name="workspace" default="$(env HOME)/mppi_swerve_drive_ros"/>
     <arg name="rvizconfig" default="$(arg workspace)/data/rviz/navigation.rviz" />
+    <arg name="model" default="$(find world_handler)/xacro/fwids_vehicle.xacro"/>
 
-    <!-- visualize fwids vehicle model in rviz -->
-    <arg name="model" default="$(find world_handler)/xacro/fwids_vehicle.xacro"/>   
-    <param name="robot_description" command="$(find xacro)/xacro $(arg model) --inorder"/>
-
-    <!-- use_sim_time: true -->
-    <param name="use_sim_time" value="true" />
-
-    <!-- open rviz -->
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
+    <include file="$(find mppi_bringup)/launch/rosbag_play.launch">
+        <arg name="workspace" value="$(arg workspace)" />
+        <arg name="rvizconfig" value="$(arg rvizconfig)" />
+        <arg name="model" value="$(arg model)" />
+    </include>
 </launch>

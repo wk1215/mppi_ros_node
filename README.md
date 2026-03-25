@@ -58,11 +58,6 @@ If you use this work in an academic context, please cite the following publicati
             curl -fsSL https://get.docker.com -o get-docker.sh
             sudo sh get-docker.sh
             ```
-    - [rocker](https://github.com/osrf/rocker)
-        - For ubuntu users:
-            ```
-            sudo apt-get install python3-rocker
-            ```
 
 1. Clone the project repository.
     ```
@@ -70,22 +65,25 @@ If you use this work in an academic context, please cite the following publicati
     git clone https://github.com/MizuhoAOKI/mppi_swerve_drive_ros
     ```
 
-1. Run for the first time setup to build the docker image.
+1. Build and start the docker container.
     ```
     cd <path to your workspace>/mppi_swerve_drive_ros
-    make setup_docker
+    docker compose build
+    docker compose up -d
     ```
 
-1. Launch the docker container and get into the bash inside.
+1. Get into the docker container.
     ```
     cd <path to your workspace>/mppi_swerve_drive_ros
-    make run_docker
+    docker compose exec noetic bash
     ```
 
 1. [Inside the docker container] Build the project.
     ```
     cd ~/mppi_swerve_drive_ros
-    make build
+    source /opt/ros/noetic/setup.bash
+    catkin build --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-O2"
+    source devel/setup.bash
     ```
 
 </details>
@@ -148,7 +146,7 @@ make clean
 ```bash
 cd <path to your workspace>/mppi_swerve_drive_ros
 source /opt/ros/noetic/setup.bash && source ./devel/setup.bash
-roslaunch launch/gazebo_world.launch gazebo_world_name:=maze
+roslaunch mppi_bringup gazebo_world.launch gazebo_world_name:=maze
 ```
 
 - `gazebo_world_name` options:
@@ -161,30 +159,60 @@ roslaunch launch/gazebo_world.launch gazebo_world_name:=maze
 
 ### [Case 2] Navigate a 4wids vehicle autonomously with a MPPI controller.
 
+> [!NOTE]
+> Workspace-root `launch/*.launch` files are retained as compatibility wrappers.
+> The recommended entrypoints now live in the `mppi_bringup` package.
+
 - Try MPPI-3D(a) (driving faster but dangerous sometimes)
     ```bash
     cd <path to your workspace>/mppi_swerve_drive_ros
     source /opt/ros/noetic/setup.bash && source ./devel/setup.bash
-    roslaunch launch/navigation.launch local_planner:=mppi_3d_a
+    roslaunch mppi_bringup navigation.launch local_planner:=mppi_3d_a
     ```
 - Try MPPI-3D(b) (relatively safe but driving slower)
     ```bash
     cd <path to your workspace>/mppi_swerve_drive_ros
     source /opt/ros/noetic/setup.bash && source ./devel/setup.bash
-    roslaunch launch/navigation.launch local_planner:=mppi_3d_b
+    roslaunch mppi_bringup navigation.launch local_planner:=mppi_3d_b
     ```
-- Try MPPI-4D (safe but relatively slow)
-    ```bash
-    cd <path to your workspace>/mppi_swerve_drive_ros
-    source /opt/ros/noetic/setup.bash && source ./devel/setup.bash
-    roslaunch launch/navigation.launch local_planner:=mppi_4d
-    ```
-- [Author's Recommendation] ⭐Try MPPI-H⭐ (good balance between quickness and safety)
-    ```bash
-    cd <path to your workspace>/mppi_swerve_drive_ros
-    source /opt/ros/noetic/setup.bash && source ./devel/setup.bash
-    roslaunch launch/navigation.launch local_planner:=mppi_h
-    ```
+
+## MPPI Algorithm Core
+
+- The controller state is `x, y, yaw`, and the control space is `vx, vy, omega`.
+- At every control cycle, MPPI samples `num_samples x prediction_horizon` control sequences, rolls them out with the kinematic model, evaluates stage cost and terminal cost, and then reconstructs the next control sequence from the weighted sampled controls.
+- The stage cost mainly contains velocity tracking along the reference path, heading alignment, collision cost, distance-to-path cost, and command change penalty.
+- The terminal cost keeps the predicted terminal state from drifting too far away from the goal.
+
+## Current MPPI Optimizations
+
+The current Noetic branch includes the following practical improvements for more stable upper-layer navigation:
+
+- Fixed the `reference_velocity` parameter loading so YAML speed settings take effect correctly.
+- Added configurable command limits for `vx`, `vy`, and `omega`, instead of relying only on hard-coded limits.
+- Added direct command smoothness penalties through `weight_cmd_change`, plus lateral velocity suppression through `weight_lateral_velocity_penalty`.
+- Disabled the swerve-specific 8D wheel command penalty in the tuned `mppi_3d_a` / `mppi_3d_b` configs, which is more suitable when only `/cmd_vel` is used as the upper-layer output.
+- Reworked the MPPI control update to reconstruct the nominal sequence from **evaluated sampled controls**, then optionally blend toward the best sample with `best_sample_blend`, which helps reduce mode averaging and oscillation.
+- Fixed the warm-start behavior by shifting the control sequence forward in receding-horizon fashion after applying the first command.
+- Fixed unstable random sampling under OpenMP by using per-sample random engines instead of a shared generator.
+- Initialized control histories explicitly so the first few control cycles are less likely to jump due to uninitialized values.
+- Kept the Savitzky-Golay filter as the final command smoothing step for the first control in the optimized sequence.
+- Removed the explicit near-goal slowdown heuristic so deceleration is decided by MPPI optimization itself rather than by a hand-crafted distance rule.
+
+### Main Parameters for Tuning
+
+For adapting to a new wheeled platform, the most important parameters are usually:
+
+- `reference_velocity`
+- `sigma`
+- `param_exploration`
+- `param_lambda`
+- `vx_min / vx_max / vy_min / vy_max / omega_min / omega_max`
+- `weight_cmd_change`
+- `weight_collision_penalty`
+- `weight_distance_error_penalty`
+- `weight_angular_error`
+- `weight_terminal_state_penalty`
+- `best_sample_blend`
 
 https://github.com/user-attachments/assets/eaeb7713-c09f-4a68-b68c-100444438f9e
 

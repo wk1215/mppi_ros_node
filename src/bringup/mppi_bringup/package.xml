@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mppi_bringup</name>
+  <version>0.0.0</version>
+  <description>Bringup package for top-level system launches in the MPPI workspace.</description>
+
+  <maintainer email="wangkang14@lenovo.com">wk</maintainer>
+
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>amcl</exec_depend>
+  <exec_depend>gmapping</exec_depend>
+  <exec_depend>groundtruth_odom_publisher</exec_depend>
+  <exec_depend>joy_controller</exec_depend>
+  <exec_depend>map_server</exec_depend>
+  <exec_depend>map_visualizer</exec_depend>
+  <exec_depend>move_base</exec_depend>
+  <exec_depend>mppi_3d</exec_depend>
+  <exec_depend>reference_costmap_generator</exec_depend>
+  <exec_depend>rviz</exec_depend>
+  <exec_depend>vel_driver</exec_depend>
+  <exec_depend>world_handler</exec_depend>
+  <exec_depend>xacro</exec_depend>
+</package>
